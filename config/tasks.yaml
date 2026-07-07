@@ -1,0 +1,311 @@
+tasks:
+  linguini:
+    benchmark_type: "linguini"
+    dataset_name: "facebook/linguini"
+    split: "test"
+    subsets: ["default"]
+    defaults:
+      batch_size: 64
+      max_new_tokens: 8192
+      temperature: 0.0
+      top_p: 1.0
+
+  mmmlu:
+    benchmark_type: "mmmlu"
+    dataset_name: "CohereLabs/Global-MMLU-Lite"
+    split: "test"
+    subsets: ["en", 'de', 'zh', 'ar', "bn", "fr", "ja", "ko", "pt", "es"] 
+    defaults:
+      batch_size: 64
+      max_new_tokens: 8192
+      temperature: 0.0
+      top_p: 1.0
+      limit_per_subset: 400 #400
+  
+  wmt24pp:
+    benchmark_type: "wmt24pp"
+    dataset_name: "google/wmt24pp"
+    split: "train"
+    subsets: ["en-ar_SA", "en-zh_CN", "en-bn_IN", "en-de_DE", "en-fr_FR", "en-ja_JP", "en-ko_KR", "en-pt_PT", "en-es_MX"] 
+    defaults:
+      batch_size: 128
+      max_new_tokens: 8192
+      temperature: 0.0
+      top_p: 1.0
+      limit_per_subset: 998 #998
+      filter_bad: false
+      src_lang: "English" 
+      include_comet: false
+
+  polymath:
+    benchmark_type: "polymath"
+    dataset_name: "Qwen/PolyMath"
+    split: "medium" #should be top, high, medium, or low
+    subsets: ["en"] #["zh", "bn", "en", "de", "ar", "fr", "ja", "ko", "pt", "es"]
+    defaults:
+      batch_size: 64
+      max_new_tokens: 8192
+      temperature: 0.0
+      top_p: 1.0
+      limit_per_subset: 400 #400
+
+  mulr:
+    benchmark_type: "mulr"
+    dataset_name: "mulr"
+    subsets: ["en", "de", "zh", "fr", "ja", "ko", "pt", "es"] #["zh", "cs", "nl", "en", "et", "fr", "de", "ja", "ko", "fa", "pt", "ru", "es", "sv", "uk"] 
+    defaults:
+      batch_size: 64
+      max_new_tokens: 8192
+      temperature: 0.0
+      top_p: 1.0
+      limit_per_subset: 90
+
+  mgsm:
+    benchmark_type: "mgsm"
+    dataset_name: "juletxara/mgsm"
+    split: "test"
+    subsets: ["bn", "de", "en", "es", "fr", "ja", "ru", "sw", "te", "th", "zh"]
+    defaults:
+      batch_size: 64
+      max_new_tokens: 2048
+      temperature: 0.0
+      top_p: 1.0
+      distillation_temperature: 0.6
+      distillation_top_p: 0.95
+      limit_per_subset: 250
+
+  xcopa:
+    benchmark_type: "xcopa"
+    dataset_name: "xcopa"
+    split: "test"
+    subsets: ["et", "ht", "id", "it", "qu", "sw", "ta", "th", "tr", "vi", "zh"]
+    defaults:
+      batch_size: 64
+      max_new_tokens: 512
+      temperature: 0.0
+      top_p: 1.0
+      limit_per_subset: 500
+
+  xstory_cloze:
+    benchmark_type: "xstory_cloze"
+    dataset_name: "juletxara/xstory_cloze"
+    split: "eval"
+    subsets: ["ar", "es", "eu", "hi", "id", "my", "ru", "sw", "te", "zh"]
+    defaults:
+      batch_size: 64
+      max_new_tokens: 512
+      temperature: 0.0
+      top_p: 1.0
+      limit_per_subset: 1511
+
+  americas_nli:
+    benchmark_type: "americas_nli"
+    dataset_name: "americas_nli"
+    split: "test"
+    subsets: ["aym", "bzd", "cni", "gn", "hch", "nah", "oto", "quy", "shp", "tar"]
+    defaults:
+      batch_size: 64
+      max_new_tokens: 512
+      temperature: 0.0
+      top_p: 1.0
+      limit_per_subset: 804
+
+  sib200:
+    benchmark_type: "sib200"
+    dataset_name: "Davlan/sib200"
+    split: "test"
+    subsets: ["ace_Arab", "ace_Latn", "acm_Arab", "acq_Arab", "aeb_Arab", "afr_Latn", "ajp_Arab", "aka_Latn",
+              "als_Latn", "amh_Ethi", "apc_Arab", "arb_Arab", "arb_Latn", "ars_Arab", "ary_Arab", "arz_Arab",
+              "asm_Beng", "ast_Latn", "awa_Deva", "ayr_Latn", "azb_Arab", "azj_Latn", "bak_Cyrl", "bam_Latn",
+              "ban_Latn", "bel_Cyrl", "bem_Latn", "ben_Beng", "bho_Deva", "bjn_Arab", "bjn_Latn", "bod_Tibt",
+              "bos_Latn", "bug_Latn", "bul_Cyrl", "cat_Latn", "ceb_Latn", "ces_Latn", "cjk_Latn", "ckb_Arab",
+              "crh_Latn", "cym_Latn", "dan_Latn", "deu_Latn", "dik_Latn", "dyu_Latn", "dzo_Tibt", "ell_Grek",
+              "eng_Latn", "epo_Latn", "est_Latn", "eus_Latn", "ewe_Latn", "fao_Latn", "fij_Latn", "fin_Latn",
+              "fon_Latn", "fra_Latn", "fur_Latn", "fuv_Latn", "gaz_Latn", "gla_Latn", "gle_Latn", "glg_Latn",
+              "grn_Latn", "guj_Gujr", "hat_Latn", "hau_Latn", "heb_Hebr", "hin_Deva", "hne_Deva", "hrv_Latn",
+              "hun_Latn", "hye_Armn", "ibo_Latn", "ilo_Latn", "ind_Latn", "isl_Latn", "ita_Latn", "jav_Latn",
+              "jpn_Jpan", "kab_Latn", "kac_Latn", "kam_Latn", "kan_Knda", "kas_Arab", "kas_Deva", "kat_Geor",
+              "kaz_Cyrl", "kbp_Latn", "kea_Latn", "khk_Cyrl", "khm_Khmr", "kik_Latn", "kin_Latn", "kir_Cyrl",
+              "kmb_Latn", "kmr_Latn", "knc_Arab", "knc_Latn", "kon_Latn", "kor_Hang", "lao_Laoo", "lij_Latn",
+              "lim_Latn", "lin_Latn", "lit_Latn", "lmo_Latn", "ltg_Latn", "ltz_Latn", "lua_Latn", "lug_Latn",
+              "luo_Latn", "lus_Latn", "lvs_Latn", "mag_Deva", "mai_Deva", "mal_Mlym", "mar_Deva", "min_Arab",
+              "min_Latn", "mkd_Cyrl", "mlt_Latn", "mni_Beng", "mos_Latn", "mri_Latn", "mya_Mymr", "nld_Latn",
+              "nno_Latn", "nob_Latn", "npi_Deva", "nqo_Nkoo", "nso_Latn", "nus_Latn", "nya_Latn", "oci_Latn",
+              "ory_Orya", "pag_Latn", "pan_Guru", "pap_Latn", "pbt_Arab", "pes_Arab", "plt_Latn", "pol_Latn",
+              "por_Latn", "prs_Arab", "quy_Latn", "ron_Latn", "run_Latn", "rus_Cyrl", "sag_Latn", "san_Deva",
+              "sat_Olck", "scn_Latn", "shn_Mymr", "sin_Sinh", "slk_Latn", "slv_Latn", "smo_Latn", "sna_Latn",
+              "snd_Arab", "som_Latn", "sot_Latn", "spa_Latn", "srd_Latn", "srp_Cyrl", "ssw_Latn", "sun_Latn",
+              "swe_Latn", "swh_Latn", "szl_Latn", "tam_Taml", "taq_Latn", "taq_Tfng", "tat_Cyrl", "tel_Telu",
+              "tgk_Cyrl", "tgl_Latn", "tha_Thai", "tir_Ethi", "tpi_Latn", "tsn_Latn", "tso_Latn", "tuk_Latn",
+              "tum_Latn", "tur_Latn", "twi_Latn", "tzm_Tfng", "uig_Arab", "ukr_Cyrl", "umb_Latn", "urd_Arab",
+              "uzn_Latn", "vec_Latn", "vie_Latn", "war_Latn", "wol_Latn", "xho_Latn", "ydd_Hebr", "yor_Latn",
+              "yue_Hant", "zho_Hans", "zho_Hant", "zsm_Latn", "zul_Latn"]
+    defaults:
+      batch_size: 64
+      max_new_tokens: 256
+      temperature: 0.0
+      top_p: 1.0
+      limit_per_subset: 204
+
+  mkqa:
+    benchmark_type: "mkqa"
+    dataset_name: "mkqa"
+    split: "train"
+    subsets: ["en", "ar", "zh_cn", "zh_hk", "zh_tw", "da", "de", "es", "fi",
+              "fr", "hu", "it", "ja", "ko", "nl", "no", "pl", "pt", "ru",
+              "sv", "th", "tr", "vi", "ms", "km", "he"]
+    defaults:
+      batch_size: 64
+      max_new_tokens: 512
+      temperature: 0.0
+      top_p: 1.0
+      limit_per_subset: 500
+
+  livecodebench:
+    benchmark_type: "livecodebench"
+    dataset_name: "livecodebench/code_generation_lite"
+    split: "test"
+    subsets: ["en"]
+    defaults:
+      batch_size: 8
+      max_new_tokens: 8192
+      temperature: 0.0
+      top_p: 1.0
+      limit_per_subset: 400
+
+  # frontiermath:
+  #   benchmark_type: "frontiermath"
+  #   dataset_name: "EleutherAI/frontiermath"
+  #   split: "test"
+  #   subsets: ["en"]
+  #   defaults:
+  #     batch_size: 8
+  #     max_new_tokens: 32768
+  #     temperature: 0.0
+  #     top_p: 1.0
+  #     limit_per_subset: 200
+
+  flores200:
+    benchmark_type: "flores200"
+    dataset_name: "Muennighoff/flores200"
+    split: "devtest"
+    subsets: ["ace_Arab", "ace_Latn", "acm_Arab", "acq_Arab", "aeb_Arab", "afr_Latn", "ajp_Arab", "aka_Latn",
+              "als_Latn", "amh_Ethi", "apc_Arab", "arb_Arab", "arb_Latn", "ars_Arab", "ary_Arab", "arz_Arab",
+              "asm_Beng", "ast_Latn", "awa_Deva", "ayr_Latn", "azb_Arab", "azj_Latn", "bak_Cyrl", "bam_Latn",
+              "ban_Latn", "bel_Cyrl", "bem_Latn", "ben_Beng", "bho_Deva", "bjn_Arab", "bjn_Latn", "bod_Tibt",
+              "bos_Latn", "bug_Latn", "bul_Cyrl", "cat_Latn", "ceb_Latn", "ces_Latn", "cjk_Latn", "ckb_Arab",
+              "crh_Latn", "cym_Latn", "dan_Latn", "deu_Latn", "dik_Latn", "dyu_Latn", "dzo_Tibt", "ell_Grek",
+              "epo_Latn", "est_Latn", "eus_Latn", "ewe_Latn", "fao_Latn", "fij_Latn", "fin_Latn", "fon_Latn",
+              "fra_Latn", "fur_Latn", "fuv_Latn", "gaz_Latn", "gla_Latn", "gle_Latn", "glg_Latn", "grn_Latn",
+              "guj_Gujr", "hat_Latn", "hau_Latn", "heb_Hebr", "hin_Deva", "hne_Deva", "hrv_Latn", "hun_Latn",
+              "hye_Armn", "ibo_Latn", "ilo_Latn", "ind_Latn", "isl_Latn", "ita_Latn", "jav_Latn", "jpn_Jpan",
+              "kab_Latn", "kac_Latn", "kam_Latn", "kan_Knda", "kas_Arab", "kas_Deva", "kat_Geor", "kaz_Cyrl",
+              "kbp_Latn", "kea_Latn", "khk_Cyrl", "khm_Khmr", "kik_Latn", "kin_Latn", "kir_Cyrl", "kmb_Latn",
+              "kmr_Latn", "knc_Arab", "knc_Latn", "kon_Latn", "kor_Hang", "lao_Laoo", "lij_Latn", "lim_Latn",
+              "lin_Latn", "lit_Latn", "lmo_Latn", "ltg_Latn", "ltz_Latn", "lua_Latn", "lug_Latn", "luo_Latn",
+              "lus_Latn", "lvs_Latn", "mag_Deva", "mai_Deva", "mal_Mlym", "mar_Deva", "min_Arab", "min_Latn",
+              "mkd_Cyrl", "mlt_Latn", "mni_Beng", "mos_Latn", "mri_Latn", "mya_Mymr", "nld_Latn", "nno_Latn",
+              "nob_Latn", "npi_Deva", "nso_Latn", "nus_Latn", "nya_Latn", "oci_Latn", "ory_Orya",
+              "pag_Latn", "pan_Guru", "pap_Latn", "pbt_Arab", "pes_Arab", "plt_Latn", "pol_Latn", "por_Latn",
+              "prs_Arab", "quy_Latn", "ron_Latn", "run_Latn", "rus_Cyrl", "sag_Latn", "san_Deva", "sat_Olck",
+              "scn_Latn", "shn_Mymr", "sin_Sinh", "slk_Latn", "slv_Latn", "smo_Latn", "sna_Latn", "snd_Arab",
+              "som_Latn", "sot_Latn", "spa_Latn", "srd_Latn", "srp_Cyrl", "ssw_Latn", "sun_Latn", "swe_Latn",
+              "swh_Latn", "szl_Latn", "tam_Taml", "taq_Latn", "taq_Tfng", "tat_Cyrl", "tel_Telu", "tgk_Cyrl",
+              "tgl_Latn", "tha_Thai", "tir_Ethi", "tpi_Latn", "tsn_Latn", "tso_Latn", "tuk_Latn", "tum_Latn",
+              "tur_Latn", "twi_Latn", "tzm_Tfng", "uig_Arab", "ukr_Cyrl", "umb_Latn", "urd_Arab", "uzn_Latn",
+              "vec_Latn", "vie_Latn", "war_Latn", "wol_Latn", "xho_Latn", "ydd_Hebr", "yor_Latn", "yue_Hant",
+              "zho_Hans", "zho_Hant", "zsm_Latn", "zul_Latn"]
+    defaults:
+      batch_size: 64
+      max_new_tokens: 512
+      temperature: 0.0
+      top_p: 1.0
+      limit_per_subset: 1012
+      src_lang: "eng_Latn"
+      include_comet: false
+
+  xnli:
+    benchmark_type: "xnli"
+    dataset_name: "xnli"
+    split: "test"
+    subsets: ["ar", "bg", "de", "el", "en", "es", "fr", "hi", "ru", "sw", "th", "tr", "ur", "vi", "zh"]
+    defaults:
+      batch_size: 64
+      max_new_tokens: 16
+      temperature: 0.0
+      top_p: 1.0
+      limit_per_subset: 400
+
+  belebele:
+    benchmark_type: "belebele"
+    dataset_name: "facebook/belebele"
+    split: "test"
+    subsets: ["eng_Latn", "arb_Arab", "zho_Hans", "deu_Latn", "ben_Beng", "fra_Latn",
+              "hin_Deva", "swh_Latn", "jpn_Jpan", "kor_Hang", "rus_Cyrl", "spa_Latn",
+              "por_Latn", "ita_Latn", "tur_Latn", "vie_Latn", "ind_Latn", "tha_Thai",
+              "pol_Latn", "nld_Latn", "ron_Latn", "ukr_Cyrl", "ces_Latn", "fin_Latn"]
+    defaults:
+      batch_size: 64
+      max_new_tokens: 16
+      temperature: 0.0
+      top_p: 1.0
+      limit_per_subset: 900
+
+  # olympiad_bench:
+  #   benchmark_type: "olympiad_bench"
+  #   dataset_name: "GAIR/OlympiadBench"
+  #   split: "test"
+  #   subsets: ["en", "zh"]
+  #   defaults:
+  #     batch_size: 32
+  #     max_new_tokens: 8192
+  #     temperature: 0.0
+  #     top_p: 1.0
+  #     limit_per_subset: 400
+
+  gpqa:
+    benchmark_type: "gpqa"
+    dataset_name: "Idavidrein/gpqa"
+    split: "train"
+    subsets: ["gpqa_diamond"]
+    defaults:
+      batch_size: 32
+      max_new_tokens: 8192
+      temperature: 0.0
+      top_p: 1.0
+
+  aime2025:
+    benchmark_type: "aime2025"
+    dataset_name: "MathArena/aime_2025"
+    split: "train"
+    subsets: ["default"]
+    defaults:
+      batch_size: 30
+      max_new_tokens: 8192
+      temperature: 0.0
+      top_p: 1.0
+
+  absencebench:
+    benchmark_type: "absencebench"
+    dataset_name: "harveyfin/AbsenceBench"
+    split: "validation"
+    subsets: ["poetry", "numerical", "github_prs"]
+    defaults:
+      batch_size: 32
+      max_new_tokens: 8192
+      temperature: 0.0
+      top_p: 1.0
+      limit_per_subset: 2000
+
+  lingoly:
+    benchmark_type: "lingoly"
+    dataset_name: "ambean/lingOly"
+    split: "test"
+    subsets: ["default"]
+    defaults:
+      batch_size: 64
+      max_new_tokens: 2048
+      temperature: 0.0
+      top_p: 1.0
+      distillation_temperature: 0.6
+      distillation_top_p: 0.95

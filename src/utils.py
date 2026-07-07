@@ -1,0 +1,117 @@
+import yaml
+import json
+import os
+from datetime import datetime
+import re
+
+def load_config(config_path):
+    """Load YAML configuration file and resolve environment variables"""
+    with open(config_path, 'r') as f:
+        content = f.read()
+    
+    # Replace ${VAR} or ${VAR:-default} with environment variable values
+    def replace_env_var(match):
+        var_name = match.group(1)
+        default_value = match.group(2)
+        value = os.getenv(var_name)
+        if value is not None:
+            return value
+        if default_value is not None:
+            return default_value
+        return match.group(0)
+
+    content = re.sub(r'\$\{(\w+)(?::-([^}]*))?\}', replace_env_var, content)
+    
+    return yaml.safe_load(content)
+
+def save_results(results, output_dir, model_name, task_name, subset, split, reasoning_mode=None):
+    """Save evaluation results"""
+    # Create directory structure based on reasoning mode
+    reasoning_enabled = results.get('reasoning', False)
+    reasoning_effort = results.get('reasoning_effort')
+    
+    if reasoning_enabled:
+        if reasoning_effort:
+            model_dir = f"{model_name}_reasoning_{reasoning_effort}"
+        else:
+            model_dir = f"{model_name}_reasoning"
+    else:
+        model_dir = f"{model_name}_no_reasoning"
+
+    if task_name == 'polymath':
+        task_name = task_name + '_' + split
+    
+    result_path = os.path.join(output_dir, task_name, model_dir, subset)
+    os.makedirs(result_path, exist_ok=True)
+    
+    # Save metadata
+    metadata = {
+        'model': model_name,
+        'task': task_name,
+        'subset': subset,
+        'split': split,
+        'reasoning_enabled': reasoning_enabled,
+        'reasoning_effort': reasoning_effort,
+        'timestamp': datetime.now().isoformat(),
+        'generation_params': results.get('generation_params', {})
+    }
+    with open(os.path.join(result_path, 'metadata.json'), 'w', encoding="utf-8") as f:
+        json.dump(metadata, f, ensure_ascii=False, indent=2)
+    
+    # Save metrics
+    with open(os.path.join(result_path, 'metrics.json'), 'w', encoding="utf-8") as f:
+        json.dump(results['metrics'], f, ensure_ascii=False, indent=2)
+    
+    # Save raw outputs
+    with open(os.path.join(result_path, 'raw_outputs.json'), 'w', encoding="utf-8") as f:
+        json.dump(results['raw_outputs'], f, ensure_ascii=False, indent=2)
+    
+    print(f"Results saved to {result_path}")
+
+def get_output_dir():
+    """Create timestamped output directory"""
+    return 'results_analysis'
+
+def save_distillation_results(results, output_dir, model_name, task_name, subset, split):
+    """Save sampled distillation outputs and the samples that matched the gold answer."""
+    if task_name == 'polymath':
+        task_name = task_name + '_' + split
+
+    result_path = os.path.join(output_dir, model_name, task_name, subset)
+    os.makedirs(result_path, exist_ok=True)
+
+    metadata = {
+        'model': model_name,
+        'task': task_name,
+        'subset': subset,
+        'split': split,
+        'reasoning_enabled': results.get('reasoning', False),
+        'reasoning_effort': results.get('reasoning_effort'),
+        'distillation': results.get('distillation', False),
+        'distillation_samples': results.get('distillation_samples', 1),
+        'generation_params': results.get('generation_params', {}),
+        'num_sampled_outputs': len(results.get('raw_outputs', [])),
+        'num_gold_outputs': len(results.get('gold_outputs', []))
+    }
+
+    with open(os.path.join(result_path, 'metadata.json'), 'w', encoding="utf-8") as f:
+        json.dump(metadata, f, ensure_ascii=False, indent=2)
+
+    with open(os.path.join(result_path, 'metrics.json'), 'w', encoding="utf-8") as f:
+        json.dump(results['metrics'], f, ensure_ascii=False, indent=2)
+
+    with open(os.path.join(result_path, 'sampled_outputs.json'), 'w', encoding="utf-8") as f:
+        json.dump(results['raw_outputs'], f, ensure_ascii=False, indent=2)
+
+    with open(os.path.join(result_path, 'gold_outputs.json'), 'w', encoding="utf-8") as f:
+        json.dump(results.get('gold_outputs', []), f, ensure_ascii=False, indent=2)
+
+    with open(os.path.join(result_path, 'all_gold_outputs.json'), 'w', encoding="utf-8") as f:
+        json.dump(results['all_gold_outputs'], f, ensure_ascii=False, indent=2)
+
+    print(f"Distillation results saved to {result_path}")
+
+
+def get_distillation_output_dir():
+    """Return output directory for distillation artifacts."""
+    return 'distilled_results'

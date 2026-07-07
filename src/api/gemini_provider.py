@@ -1,0 +1,65 @@
+from google import genai
+from google.genai import types
+from .base_provider import BaseProvider
+import asyncio
+
+class GeminiProvider(BaseProvider):
+    """Google Gemini API provider with new google-genai package"""
+    
+    def __init__(self, config):
+        super().__init__(config)
+        self.client = genai.Client(api_key=config['api_key'])
+    
+    async def generate(self, model_id, prompt, params, system_prompt=None, reasoning_effort=None, thinking_budget=0):
+        """Generate completion using Gemini asynchronously"""
+        
+        async def _generate():
+            # New API uses async natively
+            loop = asyncio.get_event_loop()
+            
+            def _sync_generate():
+                response = self.client.models.generate_content(
+                    model=model_id,
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        system_instruction=system_prompt,
+                        temperature=params.get('temperature', 0),
+                        max_output_tokens=params.get('max_tokens', 512),
+                        top_p=params.get('top_p', 1),
+                        # thinking_config=types.ThinkingConfig(thinking_budget=thinking_budget, 
+                        #                                     include_thoughts=True),
+                        thinking_config=types.ThinkingConfig(thinking_level="high", 
+                                                            include_thoughts=True),
+                        automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
+                        # Turn off thinking:
+                        # thinking_config=types.ThinkingConfig(thinking_budget=0)
+                        # Turn on dynamic thinking:
+                        # thinking_config=types.ThinkingConfig(thinking_budget=-1)
+                    )
+                )
+
+                reasoning, generation = "", ""
+                try:
+                    for part in response.candidates[0].content.parts:
+                        if not part.text:
+                            continue
+                        if part.thought:
+                            reasoning = part.text
+                        else:
+                            generation = part.text
+
+                except Exception as e:
+                    print(f"Error in receiving the response: {e}")
+
+
+                # exit()
+                return {
+                    'reasoning': reasoning,
+                    'generation': generation,
+                    'raw_generation': None,
+                    'finish_reason': response.candidates[0].finish_reason
+                }
+            
+            return await loop.run_in_executor(None, _sync_generate)
+        
+        return await self._retry_with_backoff(_generate)

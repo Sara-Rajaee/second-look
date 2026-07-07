@@ -1,0 +1,41 @@
+*.o
+*.e
+
+# data
+*.json
+*.jsonl 
+*.pdf
+!data/*.json
+# bash files with API tokens (but not scripts/)
+/*.sh
+
+*.pyc
+
+# playground files
+tmp.py
+analysis.py
+comet_eval.py
+
+# logs and results
+logs/
+results/
+train_runs/
+
+# claude code
+.claude/
+
+# virtual environment
+.venv/
+
+# environment
+.env
+
+# uv
+uv.lock
+
+# cache
+__pycache__/
+.cache/
+
+# snellius scripts
+snellius*
