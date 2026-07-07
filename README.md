@@ -38,36 +38,25 @@ A framework for evaluating language models on different tasks.
    git submodule add https://github.com/QwenLM/PolyMath.git third_party/PolyMath
    git submodule update --init --recursive
    ```
-## Serving GPT-OSS Models
+## Serving and Evaluating GPT-OSS Models on Snellius
 
-GPT-OSS models are served locally via [vLLM](https://github.com/vllm-project/vllm). A launch script is provided at `scripts/serve.sh`.
+GPT-OSS (and other HuggingFace) models are served locally via [vLLM](https://github.com/vllm-project/vllm) and evaluated in a single SLURM job using `scripts/snellius_eval.sh`. The script starts a vLLM server and runs `run.py` against it on the same node, so no manual server/eval handoff is needed.
 
-**Prerequisites:** Install vLLM (`pip install vllm`) and have GPU(s) available.
+**Prerequisites:** A `second-look` conda environment with vLLM installed, and GPU(s) available on the allocated node.
 
 ```bash
-# Serve gpt-oss-20b (auto-detects available GPUs for tensor parallelism)
-bash scripts/serve.sh openai/gpt-oss-20b
+sbatch scripts/snellius_eval.sh <vllm_model_id_or_path> <eval_model_name> <task> [extra run.py args...]
 
-# Serve gpt-oss-120b on 4 GPUs, custom port
-TP=4 PORT=8000 bash scripts/serve.sh openai/gpt-oss-120b
-
-# Serve any HuggingFace model
-bash scripts/serve.sh meta-llama/Llama-3.3-70B-Instruct
+# Example: serve gpt-oss-120b and evaluate it on polymath
+sbatch scripts/snellius_eval.sh openai/gpt-oss-120b gpt-oss-120b polymath
 ```
 
-The server exposes an OpenAI-compatible API at `http://localhost:19743/v1/` (by default).
-Once the server is running, use `run.py` in a separate terminal to evaluate against it.
+- `<vllm_model_id_or_path>` — the model to serve (HuggingFace ID or local checkpoint path)
+- `<eval_model_name>` — the `--model` name as registered in `config/models.yaml`
+- `<task>` — the `--task` name as registered in `config/tasks.yaml`
+- any extra arguments are forwarded to `run.py`
 
-**Environment variables for `scripts/serve.sh`:**
-
-| Variable | Default | Description |
-|-----------|---------|-------------|
-| `PORT` | `19743` | API server port |
-| `TP` | auto-detect | Tensor-parallel GPU count |
-| `DTYPE` | `auto` | Model dtype (`auto`, `float16`, `bfloat16`) |
-| `MAX_MODEL_LEN` | vLLM default | Max sequence length |
-| `GPU_UTIL` | `0.9` | GPU memory utilization (0.0–1.0) |
-| `EXTRA_ARGS` | | Additional `vllm serve` arguments |
+The vLLM server exposes an OpenAI-compatible API on `localhost` (port `19743` by default, override with `PORT`) and tensor-parallel size auto-detects from the GPUs allocated to the job. The server is shut down automatically once the evaluation finishes.
 
 ## Usage
 
