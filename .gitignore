@@ -6,8 +6,11 @@
 *.jsonl 
 *.pdf
 !data/*.json
+data/
 # bash files with API tokens (but not scripts/)
 /*.sh
+*.csv
+outputs/
 
 *.pyc
 
