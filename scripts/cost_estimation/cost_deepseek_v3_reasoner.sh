@@ -1,11 +1,16 @@
 #!/usr/bin/env bash
 
-# Model: DeepSeek reasoner endpoint for the DeepSeek-V3-era family (`deepseek-reasoner`)
+# Model: current model behind the legacy `deepseek-reasoner` alias (V4 Flash).
 # Pricing/docs:
 # https://api-docs.deepseek.com/guides/reasoning_model
 # https://api-docs.deepseek.com/quick_start/pricing-details-usd
-# API cost used here: $0.55 / 1M input tokens (cache miss), $2.19 / 1M output tokens.
-# The pricing details page lists MAX COT TOKENS = 32K and MAX OUTPUT TOKENS = 8K.
-# We therefore model a 32K thinking budget with a 40K total billed-output upper bound.
+# Current cache-miss pricing used here: $0.14 / 1M input, $0.28 / 1M output.
+# Recheck the alias and price before rerunning because the alias is being retired.
 
-.venv/bin/python scripts/cost_estimation/estimate_cost.py --quick --sample-n 1 --jobs 5 --price-in 0.55 --price-out 2.19 --out-upper 40000 --summary-json outputs/cost_deepseek_v3_reasoner_32kthinking_40kcap.json
+.venv/bin/python scripts/cost_estimation/estimate_cost.py \
+  --quick --sample-n 300 --sample-seed 42 --jobs 5 \
+  --price-in 0.14 --price-out 0.28 \
+  --reasoning-budgets 1000 5000 20000 --visible-output-tokens 1000 \
+  --allow-partial-languages --model-id deepseek-v4-flash-via-reasoner-alias \
+  --summary-json outputs/cost_deepseek_reasoning_scenarios.json \
+  --summary-markdown outputs/cost_deepseek_reasoning_scenarios.md

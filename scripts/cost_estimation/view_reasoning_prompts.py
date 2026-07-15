@@ -23,15 +23,15 @@ def global_piqa_parallel_key_normalizer(split: str, row: dict, i: int):
 
 
 @lru_cache(maxsize=None)
-def load_split(hf_path: str, config_name: str, split: str):
+def load_split(hf_path: str, config_name: str, split: str, revision: str):
     """Load and cache a dataset split."""
-    return load_dataset(hf_path, config_name, split=split)
+    return load_dataset(hf_path, config_name, split=split, revision=revision)
 
 
 @lru_cache(maxsize=None)
-def dataset_configs(hf_path: str):
+def dataset_configs(hf_path: str, revision: str):
     """Load and cache the available config names for a dataset."""
-    return tuple(get_dataset_config_names(hf_path))
+    return tuple(get_dataset_config_names(hf_path, revision=revision))
 
 
 def english_config_for_spec(spec: ec.DatasetSpec) -> str | None:
@@ -43,24 +43,9 @@ def english_config_for_spec(spec: ec.DatasetSpec) -> str | None:
 
 def target_configs_for_spec(spec: ec.DatasetSpec) -> list[str]:
     """Return the non-English configs that can be previewed for a dataset."""
-    configs = list(spec.configs or dataset_configs(spec.hf_path))
+    configs = list(spec.configs or dataset_configs(spec.hf_path, spec.revision))
     english_config = english_config_for_spec(spec)
     return [cfg for cfg in configs if cfg != english_config]
-
-
-def normalize_mmmlu_english_row(row: dict) -> dict:
-    """Map cais/mmlu English rows onto the MMMLU field names."""
-    choices = row["choices"]
-    answer_map = {0: "A", 1: "B", 2: "C", 3: "D"}
-    return {
-        "Question": row["question"],
-        "A": choices[0],
-        "B": choices[1],
-        "C": choices[2],
-        "D": choices[3],
-        "Answer": answer_map[row["answer"]],
-        "Subject": row["subject"],
-    }
 
 
 def embedded_global_piqa_source_row(row: dict) -> dict:
@@ -123,10 +108,10 @@ def load_source_index(spec: ec.DatasetSpec, split: str) -> dict:
 
     if spec.external_english is not None:
         ee = spec.external_english
-        ds = load_split(ee["hf_path"], ee["config"], ee["split"])
+        ds = load_split(ee["hf_path"], ee["config"], ee["split"], ee["revision"])
         if spec.key == "mmmlu":
             return {
-                ec.canonical_row_key(spec, split, row, i): normalize_mmmlu_english_row(row)
+                ec.canonical_row_key(spec, split, row, i): ec.normalize_mmmlu_english_row(row)
                 for i, row in enumerate(ds)
             }
         return {
@@ -138,7 +123,7 @@ def load_source_index(spec: ec.DatasetSpec, split: str) -> dict:
     if english_config is None:
         raise ValueError(f"{spec.key}: no English source configuration is available")
 
-    ds = load_split(spec.hf_path, english_config, split)
+    ds = load_split(spec.hf_path, english_config, split, spec.revision)
     return {
         ec.canonical_row_key(spec, split, row, i): row
         for i, row in enumerate(ds)
@@ -147,7 +132,7 @@ def load_source_index(spec: ec.DatasetSpec, split: str) -> dict:
 
 def load_aligned_rows(spec: ec.DatasetSpec, lang: str, split: str, index: int) -> tuple[dict, dict]:
     """Load one aligned source/target example pair for preview."""
-    tgt_ds = load_split(spec.hf_path, lang, split)
+    tgt_ds = load_split(spec.hf_path, lang, split, spec.revision)
     if index < 0 or index >= len(tgt_ds):
         raise IndexError(
             f"{spec.key}/{lang}/{split}: index {index} is out of range for {len(tgt_ds)} rows"
