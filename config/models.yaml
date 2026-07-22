@@ -126,3 +126,21 @@ models:
       top_p: 1
       thinking_budget: 24576
       reasoning: True
+
+  - name: "qwen3.5-4b"
+    provider: "gpt_oss"
+    model_id: "Qwen/Qwen3.5-4B"
+    default_params:
+      temperature: 0
+      max_tokens: 32768
+      top_p: 1
+      reasoning: True
+
+  - name: "gemma-4-12b"
+    provider: "gpt_oss"
+    model_id: "google/gemma-4-12B-it"
+    default_params:
+      temperature: 0
+      max_tokens: 32768
+      top_p: 1
+      reasoning: True # uses <|channel>thought ... <channel|> markers, not <think>; see gpt_oss_provider.py

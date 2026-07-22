@@ -21,5 +21,5 @@ cohere:
 gpt_oss:
   api_base: ${GPT_OSS_API_BASE:-http://localhost:19743/v1/}
   api_key: ${GPT_OSS_API_KEY:-no-key}
-  timeout: 600
+  timeout: 1800 # local generations can run up to max_tokens (32768) at ~20 tok/s under eager mode, ~27min worst case
   max_retries: 3
