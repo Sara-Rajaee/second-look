@@ -107,6 +107,8 @@ class BenchmarkFactory:
             return AbsenceBenchmark(task_config, subset)
         elif benchmark_type == 'lingoly':
             return LingOlyBenchmark(task_config, subset)
+        elif benchmark_type == 'global_piqa':
+            return GlobalPIQABenchmark(task_config, subset)
         else:
             raise ValueError(f"Unknown benchmark: {benchmark_type}")
 
@@ -2411,6 +2413,75 @@ class LingOlyBenchmark(BaseBenchmark):
             correct += match
             scores.append(match)
 
+        total = len(predictions)
+        return {
+            'accuracy': (correct / total * 100) if total > 0 else 0,
+            'correct': correct,
+            'total': total,
+            'per_example_accuracy': scores,
+        }
+
+
+# ---------- Global PIQA ----------
+
+@dataclass
+class GlobalPIQAExample:
+    id: str
+    question: str
+    A: str
+    B: str
+    C: str
+    D: str
+    answer: str     # "A", "B", "C", or "D"
+
+
+class GlobalPIQABenchmark(BaseBenchmark):
+    """Global PIQA (parallel set): multilingual physical commonsense reasoning (mrlbenchmarks/global-piqa-parallel)."""
+
+    def load_data(self):
+        name = self.task_config['dataset_name']
+        split = self.task_config['split']
+        limit = self.defaults.get('limit_per_subset')
+
+        print(f"Loading {name} ({self.subset})...")
+        ds = load_dataset(name, self.subset, split=split)
+
+        if limit:
+            ds = ds.select(range(min(limit, len(ds))))
+
+        examples = []
+        for i, r in enumerate(ds):
+            options = [r["solution0"], r["solution1"], r["solution2"], r["solution3"]]
+            examples.append(GlobalPIQAExample(
+                id=f"{self.subset}_{i}",
+                question=r["prompt"],
+                A=options[0],
+                B=options[1],
+                C=options[2],
+                D=options[3],
+                answer=chr(ord('A') + r["label"]),
+            ))
+
+        self.dataset = examples
+        print(f"Loaded {len(examples)} examples from {self.subset}")
+        return examples
+
+    def prepare_prompt(self, example):
+        return (
+            "The following is a multi-choice question about physical commonsense reasoning. "
+            "Answer with only the letter (A, B, C, or D). Do not include explanations in your final answer.\n\n"
+            f"{example.question}\n"
+            f"A) {example.A}\nB) {example.B}\nC) {example.C}\nD) {example.D}\n\n"
+        )
+
+    def evaluate(self, predictions, references, eval_types=None, points=None):
+        correct = 0
+        scores = []
+        for pred, ref in zip(predictions, references):
+            extracted = extract_choice(pred).upper()
+            match = int(extracted == ref.strip().upper())
+            scores.append(match)
+            correct += match
         total = len(predictions)
         return {
             'accuracy': (correct / total * 100) if total > 0 else 0,
