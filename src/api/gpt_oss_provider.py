@@ -6,6 +6,8 @@ from .base_provider import BaseProvider
 THINK_TAG_RE = re.compile(r"<think>(.*?)</think>", re.DOTALL)
 # Qwen3-Thinking emits only the closing </think> (opening tag is in chat template)
 THINK_CLOSE_ONLY_RE = re.compile(r"^(.*?)</think>\s*(.*)$", re.DOTALL)
+# Gemma 4 uses an asymmetric channel marker instead of <think>: <|channel>thought ... <channel|>
+GEMMA_CHANNEL_RE = re.compile(r"<\|channel>thought\s*(.*?)\s*<channel\|>", re.DOTALL)
 
 
 class GptOssProvider(BaseProvider):
@@ -33,6 +35,8 @@ class GptOssProvider(BaseProvider):
         Tries multiple strategies in order:
           1. ``reasoning_content`` field (OpenAI reasoning API)
           2. ``<think>...</think>`` tags in content (DeepSeek-R1 style)
+          2b. Closing-only ``</think>`` (Qwen3-Thinking style)
+          2c. ``<|channel>thought ... <channel|>`` markers (Gemma 4 style)
           3. Treat entire content as the answer (no reasoning detected)
         """
         raw_content = message.content or ""
@@ -67,6 +71,17 @@ class GptOssProvider(BaseProvider):
                     "raw_generation": raw_content,
                 }
 
+        # Strategy 2c: Gemma 4 channel markers
+        channel_match = GEMMA_CHANNEL_RE.search(raw_content)
+        if channel_match:
+            reasoning = channel_match.group(1).strip()
+            generation = GEMMA_CHANNEL_RE.sub("", raw_content).strip()
+            return {
+                "reasoning": reasoning,
+                "generation": generation,
+                "raw_generation": raw_content,
+            }
+
         # Strategy 3: no reasoning detected
         return {
             "reasoning": None,
@@ -91,6 +106,8 @@ class GptOssProvider(BaseProvider):
                 max_tokens=params.get("max_tokens", 4096),
                 top_p=params.get("top_p", 1),
                 num_retries=self.max_retries,
+                timeout=self.timeout,
+                extra_body={"chat_template_kwargs": {"enable_thinking": bool(params.get("reasoning", False))}},
             )
 
             response = await acompletion(**kwargs)
