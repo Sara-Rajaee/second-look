@@ -1,13 +1,14 @@
 #!/bin/bash
 #SBATCH --job-name=seclook-eval
-#SBATCH --partition=gpu_h100
+#SBATCH --partition=gpu
 #SBATCH --ntasks=1
 #SBATCH --gpus-per-task=1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=64G
-#SBATCH --time=04:00:00
+#SBATCH --time=24:00:00
 #SBATCH --output=logs/eval_%j.out
 #SBATCH --error=logs/eval_%j.err
+#SBATCH --exclude=ilps-cn[101-115],ilps-cn119
 
 # Serves a model with vLLM and runs the second-look evaluation against it,
 # both inside a single sbatch job/node (no .server_endpoint handoff needed).
@@ -28,7 +29,22 @@ TASK="${3:?Missing <task> (the --task name as registered in config/tasks.yaml)}"
 shift 3
 EXTRA_RUN_ARGS=("$@")
 
-PORT="${PORT:-19743}"
+export PATH="/home/srajaee/.conda/envs/sec-look/bin:$PATH"
+source /home/srajaee/.bashrc
+conda activate sec-look
+
+export CUDA_HOME="/usr/local/cuda-12.3"
+export LD_PRELOAD=$CONDA_PREFIX/lib/libstdc++.so
+export PATH="${CUDA_HOME}/bin:${PATH}"
+export LIBRARY_PATH="${CUDA_HOME}/lib64:${LIBRARY_PATH}"
+
+export LD_LIBRARY_PATH="${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}"
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/srajaee/anaconda3/lib/
+# Pick a free port so concurrent jobs on the same node never collide (unless
+# the caller pins one explicitly via PORT=... in the environment).
+if [ -z "${PORT}" ]; then
+    PORT=$(python3 -c 'import socket; s = socket.socket(); s.bind(("", 0)); print(s.getsockname()[1]); s.close()')
+fi
 
 echo "════════════════════════════════════════════════════════════"
 echo "  Second-Look serve + eval"
@@ -42,11 +58,7 @@ echo "  Port:        $PORT"
 echo "════════════════════════════════════════════════════════════"
 nvidia-smi
 
-export PATH="/home/srajaee/.conda/envs/second-look/bin:$PATH"
-source activate second-look
-
-export HF_HOME="/scratch-shared/srajaee/HF/cache/hub/"
-export HF_HUB_OFFLINE=1
+export HF_HOME="/fnwi_fs/ivi/irlab/personal/srajaee/hf_cache"
 export TIKTOKEN_RS_CACHE_DIR="${HOME}/.cache/tiktoken-rs-cache"
 export TIKTOKEN_ENCODINGS_BASE="${HOME}/.cache/tiktoken-rs-cache/"
 export http_proxy="" HTTP_PROXY="" https_proxy="" HTTPS_PROXY=""
@@ -54,6 +66,14 @@ export http_proxy="" HTTP_PROXY="" https_proxy="" HTTPS_PROXY=""
 cd "${SLURM_SUBMIT_DIR:-$(dirname "$(readlink -f "$0")")/..}"
 
 TP=$(nvidia-smi -L | wc -l)
+
+REASONING_PARSER_ARGS=()
+if [[ "${VLLM_MODEL,,}" == *gemma* ]]; then
+    # Gemma 4 wraps reasoning in <|channel>thought ... <channel|> special tokens that
+    # get stripped from plain-text output; use vLLM's built-in parser so it lands in
+    # the response's reasoning_content field instead.
+    REASONING_PARSER_ARGS=(--reasoning-parser gemma4)
+fi
 
 echo "Starting vLLM server (TP=${TP}) on port ${PORT}..."
 vllm serve "${VLLM_MODEL}" \
@@ -63,6 +83,7 @@ vllm serve "${VLLM_MODEL}" \
     --dtype auto \
     --gpu-memory-utilization 0.9 \
     --trust-remote-code \
+    "${REASONING_PARSER_ARGS[@]}" \
     > "logs/eval_${SLURM_JOB_ID}_vllm.log" 2>&1 &
 VLLM_PID=$!
 trap '[ -n "$VLLM_PID" ] && kill "$VLLM_PID" 2>/dev/null' EXIT
