@@ -39,3 +39,6 @@ uv.lock
 # cache
 __pycache__/
 .cache/
+
+build/*
+src/lingo_reason.egg-info/*
