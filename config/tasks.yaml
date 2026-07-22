@@ -14,14 +14,13 @@ tasks:
     benchmark_type: "mmmlu"
     dataset_name: "CohereLabs/Global-MMLU-Lite"
     split: "test"
-    subsets: ["en", 'de', 'zh', 'ar', "bn", "fr", "ja", "ko", "pt", "es"] 
+    subsets: ["en", "fr", "de", "id", "it", "ja", "ko", "pt", "es"] # TEMP: backfill missing gemma-4-12b subsets (ar,zh already done)
     defaults:
       batch_size: 64
       max_new_tokens: 8192
       temperature: 0.0
       top_p: 1.0
-      limit_per_subset: 400 #400
-  
+
   wmt24pp:
     benchmark_type: "wmt24pp"
     dataset_name: "google/wmt24pp"
@@ -40,8 +39,8 @@ tasks:
   polymath:
     benchmark_type: "polymath"
     dataset_name: "Qwen/PolyMath"
-    split: "medium" #should be top, high, medium, or low
-    subsets: ["en"] #["zh", "bn", "en", "de", "ar", "fr", "ja", "ko", "pt", "es"]
+    split: "high" #should be top, high, medium, or low
+    subsets: ["ar", "zh", "en", "fr", "de", "id", "it", "ja", "ko", "pt", "ru", "es", "vi"]
     defaults:
       batch_size: 64
       max_new_tokens: 8192
@@ -296,6 +295,17 @@ tasks:
       temperature: 0.0
       top_p: 1.0
       limit_per_subset: 2000
+
+  global_piqa:
+    benchmark_type: "global_piqa"
+    dataset_name: "mrlbenchmarks/global-piqa-parallel"
+    split: "test"
+    subsets: ["cmn_hans", "ben_beng", "eng_latn", "deu_latn", "arb_arab", "fra_latn_fran", "jpn_jpan", "kor_hang", "por_latn_port", "spa_latn_spai"] # same language set as polymath: zh, bn, en, de, ar, fr, ja, ko, pt, es
+    defaults:
+      batch_size: 64
+      max_new_tokens: 512
+      temperature: 0.0
+      top_p: 1.0
 
   lingoly:
     benchmark_type: "lingoly"
