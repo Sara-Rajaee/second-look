@@ -10,7 +10,9 @@ data/
 # bash files with API tokens (but not scripts/)
 /*.sh
 *.csv
-outputs/
+outputs/*
+!outputs/consistency/
+!outputs/consistency/*.png
 
 *.pyc
 
@@ -29,6 +31,10 @@ train_runs/
 
 # virtual environment
 .venv/
+
+# node-local install config (see configs/derive_paths.sh)
+configs/local/*.env
+configs/.node_envs/
 
 # environment
 .env
