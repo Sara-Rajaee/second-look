@@ -9,10 +9,10 @@ Usage:
 
 Outputs, per (task, model), one CSV matrix and one matching PNG heatmap for
 each of four quadrants (languages x languages):
-    {out_dir}/{task}__{model}__both_correct.csv / .png    both langs correct
-    {out_dir}/{task}__{model}__both_wrong.csv / .png       both langs wrong
-    {out_dir}/{task}__{model}__only_a_correct.csv / .png   row lang correct, col lang wrong
-    {out_dir}/{task}__{model}__only_b_correct.csv / .png   col lang correct, row lang wrong
+    {out_dir}/{task}/{model}/both_correct.csv / .png     both langs correct
+    {out_dir}/{task}/{model}/both_wrong.csv / .png       both langs wrong
+    {out_dir}/{task}/{model}/only_a_correct.csv / .png   row lang correct, col lang wrong
+    {out_dir}/{task}/{model}/only_b_correct.csv / .png   col lang correct, row lang wrong
 Plus one long-format summary across all pairs:
     {out_dir}/pairwise_summary.csv
 """
@@ -27,7 +27,7 @@ import pandas as pd
 from matplotlib.colors import LinearSegmentedColormap
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from load_results import DEFAULT_RESULTS_DIR, load_examples
+from load_results import DEFAULT_RESULTS_DIR, load_examples, local_id
 
 DEFAULT_OUT_DIR = Path(__file__).resolve().parents[2] / "outputs" / "heatmaps"
 
@@ -46,11 +46,6 @@ INK_SECONDARY = "#52514e"
 INK_MUTED = "#898781"
 SURFACE = "#fcfcfb"
 GRIDLINE = "#e1e0d9"
-
-
-def local_id(row) -> str:
-    prefix = f"{row['lang']}_"
-    return row["id"][len(prefix):] if row["id"].startswith(prefix) else row["id"]
 
 
 def pairwise_counts(wide: pd.DataFrame, lang_a: str, lang_b: str) -> dict:
@@ -154,17 +149,18 @@ def build_heatmaps(examples: pd.DataFrame, out_dir: Path) -> pd.DataFrame:
                     summary_rows.append({"task": task, "model": model,
                                           "lang_a": lang_a, "lang_b": lang_b, **c})
 
-        safe_model = model.replace("/", "_")
         titles = {
             "both_correct": "both correct",
             "both_wrong": "both wrong",
             "only_a_correct": "row language correct, column wrong",
             "only_b_correct": "column language correct, row wrong",
         }
+        pair_dir = out_dir / task / model.replace("/", "_")
+        pair_dir.mkdir(parents=True, exist_ok=True)
         for name, matrix in quadrants.items():
-            matrix.to_csv(out_dir / f"{task}__{safe_model}__{name}.csv")
+            matrix.to_csv(pair_dir / f"{name}.csv")
             plot_heatmap(matrix, f"{task} / {model} — {titles[name]}",
-                         QUADRANT_RAMPS[name], out_dir / f"{task}__{safe_model}__{name}.png")
+                         QUADRANT_RAMPS[name], pair_dir / f"{name}.png")
 
     summary = pd.DataFrame(summary_rows)
     summary.to_csv(out_dir / "pairwise_summary.csv", index=False)
@@ -180,7 +176,7 @@ def main():
     examples = load_examples(args.results_dir)
     summary = build_heatmaps(examples, Path(args.out_dir))
     print(summary.to_string(index=False))
-    print(f"\nWrote per-(task,model) matrices and pairwise_summary.csv to {args.out_dir}")
+    print(f"\nWrote {{task}}/{{model}}/ matrices and pairwise_summary.csv to {args.out_dir}")
 
 
 if __name__ == "__main__":

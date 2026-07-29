@@ -10,9 +10,12 @@ data/
 # bash files with API tokens (but not scripts/)
 /*.sh
 *.csv
-outputs/*
-!outputs/consistency/
-!outputs/consistency/*.png
+# Track the generated plots at any depth (heatmaps nest as {task}/{model}/*.png),
+# but nothing else under outputs/. The directory re-include is required: git will
+# not descend into an excluded directory, so `!outputs/**/*.png` alone never matches.
+outputs/**
+!outputs/**/
+!outputs/**/*.png
 
 *.pyc
 

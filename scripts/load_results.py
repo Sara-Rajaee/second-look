@@ -43,12 +43,18 @@ def load_runs(results_dir: str | Path = DEFAULT_RESULTS_DIR) -> pd.DataFrame:
         gen_params = metadata.pop("generation_params", {})
         rows.append(
             {
-                "task": task,
-                "model": model,
-                "lang": lang,
                 **metrics,
                 **metadata,
                 **{f"gen_{k}": v for k, v in gen_params.items()},
+                # Directory-derived identity wins over metadata.json, which carries its
+                # own `task`/`model` keys. Those drop the run-variant suffix (metadata
+                # says "gemma-4-12b" where the dir says "gemma-4-12b_reasoning"), so
+                # letting them through both renamed the model relative to
+                # load_examples() and made reasoning/non-reasoning runs of the same
+                # model indistinguishable.
+                "task": task,
+                "model": model,
+                "lang": lang,
                 "run_dir": str(run_dir),
             }
         )

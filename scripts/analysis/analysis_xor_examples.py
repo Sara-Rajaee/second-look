@@ -11,8 +11,21 @@ Usage:
                                                        [--tasks TASK ...] [--models MODEL ...]
 
 Outputs, per task:
-    {out_dir}/{task}/all_models/{lang_a}_{lang_b}/output.jsonl
-    {out_dir}/{task}/{safe_model}/{lang_a}_{lang_b}/output.jsonl
+    {out_dir}/{task}/by_losing_language/{lang}/strong_xor_losses.jsonl
+    {out_dir}/{task}/{safe_model}/{lang_a}__{lang_b}/examples.jsonl
+
+The strong-XOR results are grouped by the language that *lost*: one folder per
+language, written only when that language actually lost at least one item, each
+holding every such item regardless of which language won it. That matches the
+n_losing_strong_xor column of analysis_xor_stats.py, so the counts there can be
+audited by counting lines here.
+
+The per-model pair dirs join the language pair on a double underscore because the
+codes themselves contain single underscores and vary in segment count (arb_arab,
+fra_latn_fran), so a single-underscore join could not be parsed back apart.
+
+Language payloads are nested under a "langs" key rather than spread across the top
+level, so a language code can never collide with a metadata key.
 """
 
 import argparse
@@ -26,7 +39,8 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from load_results import DEFAULT_RESULTS_DIR, load_examples, local_id
 
-DEFAULT_OUT_DIR = Path("/fnwi_fs/ivi/irlab/personal/stroshi/second_look/outputs/xor_examples")
+XOR_OUT_ROOT = Path("/fnwi_fs/ivi/irlab/personal/stroshi/second_look/outputs/xor")
+DEFAULT_OUT_DIR = XOR_OUT_ROOT / "examples"
 
 RECORD_COLS = ["source", "prompt", "generation", "target_text", "score_accuracy"]
 
@@ -40,6 +54,13 @@ def per_model_score_wide(model_df: pd.DataFrame) -> pd.DataFrame:
 def per_model_records(model_df: pd.DataFrame, lang: str) -> dict:
     lang_df = model_df[model_df["lang"] == lang].set_index("local_id")
     return lang_df[RECORD_COLS].to_dict(orient="index")
+
+
+def pair_jsonl_path(out_dir: Path, task: str, who: str, lang_a: str, lang_b: str) -> Path:
+    """{out_dir}/{task}/{who}/{lang_a}__{lang_b}/examples.jsonl, dir created."""
+    pair_dir = out_dir / task / who.replace("/", "_") / f"{lang_a}__{lang_b}"
+    pair_dir.mkdir(parents=True, exist_ok=True)
+    return pair_dir / "examples.jsonl"
 
 
 def write_per_model_xor(out_dir: Path, task: str, lang_a: str, lang_b: str,
@@ -58,35 +79,58 @@ def write_per_model_xor(out_dir: Path, task: str, lang_a: str, lang_b: str,
         if not rows:
             continue
 
-        safe_model = model.replace("/", "_")
-        pair_dir = out_dir / task / safe_model / f"{lang_a}_{lang_b}"
-        pair_dir.mkdir(parents=True, exist_ok=True)
-        with open(pair_dir / "output.jsonl", "w") as f:
+        with open(pair_jsonl_path(out_dir, task, model, lang_a, lang_b), "w") as f:
             for id_, solved_lang in rows:
                 rec = {
                     "id": id_,
                     "solved_lang": solved_lang,
-                    lang_a: records[(model, lang_a)].get(id_),
-                    lang_b: records[(model, lang_b)].get(id_),
+                    # Nested rather than spread at the top level: language codes and
+                    # metadata keys would otherwise share a namespace, and Indonesian's
+                    # code ("id") silently overwrote the item id.
+                    "langs": {
+                        lang_a: records[(model, lang_a)].get(id_),
+                        lang_b: records[(model, lang_b)].get(id_),
+                    },
                 }
                 f.write(json.dumps(rec, ensure_ascii=False) + "\n")
 
 
-def write_all_models_xor(out_dir: Path, task: str, lang_a: str, lang_b: str,
-                          task_models: list[str], score_wide: dict, records: dict) -> None:
+def lang_payload(lang: str, id_: str, eligible: list[str], records: dict) -> dict:
+    """The shared item text for `lang` plus each model's generation and score."""
+    shared = None
+    per_model = {}
+    for m in eligible:
+        full = records[(m, lang)].get(id_)
+        if full is None:
+            continue
+        if shared is None:
+            shared = {k: full[k] for k in ("source", "prompt", "target_text")}
+        per_model[m] = {"generation": full["generation"],
+                        "score_accuracy": full["score_accuracy"]}
+    return {**(shared or {}), "per_model": per_model}
+
+
+def collect_strong_xor_losses(task: str, lang_a: str, lang_b: str, task_models: list[str],
+                               score_wide: dict, records: dict) -> dict[str, list[dict]]:
+    """Strong XOR for one language pair, grouped by the language that lost.
+
+    A "strong" XOR is an item that every eligible model (at least two) solves in one
+    language and fails in the other, with all of them agreeing on which language wins.
+    Returns {losing_lang: [record, ...]}; empty when the pair yields nothing.
+    """
     eligible = [m for m in task_models
                 if lang_a in score_wide[m].columns and lang_b in score_wide[m].columns]
     if len(eligible) < 2:
-        return
+        return {}
 
     common_ids = None
     for m in eligible:
         ids = set(score_wide[m][[lang_a, lang_b]].dropna().index)
         common_ids = ids if common_ids is None else common_ids & ids
     if not common_ids:
-        return
+        return {}
 
-    rows = []
+    losses: dict[str, list[dict]] = {}
     for id_ in sorted(common_ids):
         directions = set()
         agrees = True
@@ -100,29 +144,58 @@ def write_all_models_xor(out_dir: Path, task: str, lang_a: str, lang_b: str,
             else:
                 agrees = False
                 break
-        if agrees and len(directions) == 1:
-            rows.append((id_, next(iter(directions))))
-    if not rows:
-        return
+        if not (agrees and len(directions) == 1):
+            continue
 
-    pair_dir = out_dir / task / "all_models" / f"{lang_a}_{lang_b}"
-    pair_dir.mkdir(parents=True, exist_ok=True)
-    with open(pair_dir / "output.jsonl", "w") as f:
-        for id_, solved_lang in rows:
-            rec = {"id": id_, "solved_lang": solved_lang, "models": eligible}
-            for lang in (lang_a, lang_b):
-                shared = None
-                per_model = {}
-                for m in eligible:
-                    full = records[(m, lang)].get(id_)
-                    if full is None:
-                        continue
-                    if shared is None:
-                        shared = {k: full[k] for k in ("source", "prompt", "target_text")}
-                    per_model[m] = {"generation": full["generation"],
-                                    "score_accuracy": full["score_accuracy"]}
-                rec[lang] = {**(shared or {}), "per_model": per_model}
-            f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+        winner = next(iter(directions))
+        loser = lang_b if winner == lang_a else lang_a
+        losses.setdefault(loser, []).append({
+            "id": id_,
+            "task": task,
+            "losing_lang": loser,
+            "winning_lang": winner,
+            "models": eligible,
+            "langs": {lang: lang_payload(lang, id_, eligible, records)
+                      for lang in (loser, winner)},
+        })
+    return losses
+
+
+def write_losses_by_language(out_dir: Path, task: str,
+                              losses_by_lang: dict[str, list[dict]]) -> list[str]:
+    """One folder per losing language, written only for languages that actually lost.
+
+    {out_dir}/{task}/by_losing_language/{lang}/strong_xor_losses.jsonl
+
+    One line per distinct item, not per language pair: an item that several languages
+    beat is merged into a single record listing all of them under `winning_langs`.
+    Line count therefore equals n_losing_strong_xor in analysis_xor_stats.py's CSV,
+    which also counts distinct items.
+    """
+    written = []
+    for lang in sorted(losses_by_lang):
+        merged: dict[str, dict] = {}
+        for rec in losses_by_lang[lang]:
+            existing = merged.get(rec["id"])
+            if existing is None:
+                merged[rec["id"]] = {**rec, "winning_langs": [rec["winning_lang"]]}
+                merged[rec["id"]].pop("winning_lang")
+            else:
+                existing["winning_langs"].append(rec["winning_lang"])
+                existing["langs"].update(rec["langs"])
+        if not merged:
+            continue
+
+        lang_dir = out_dir / task / "by_losing_language" / lang
+        lang_dir.mkdir(parents=True, exist_ok=True)
+        with open(lang_dir / "strong_xor_losses.jsonl", "w") as f:
+            # Sorted so the file is stable across runs and diffable.
+            for id_ in sorted(merged):
+                rec = merged[id_]
+                rec["winning_langs"] = sorted(set(rec["winning_langs"]))
+                f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+        written.append(f"{lang}({len(merged)})")
+    return written
 
 
 def build_xor_examples(examples: pd.DataFrame, out_dir: Path,
@@ -159,11 +232,18 @@ def build_xor_examples(examples: pd.DataFrame, out_dir: Path,
             for lang in langs:
                 records[(model, lang)] = per_model_records(model_df, lang)
 
+        # Strong-XOR losses are accumulated across every pair first, so each language
+        # ends up with a single file listing every item it lost, whoever beat it.
+        losses_by_lang: dict[str, list[dict]] = {}
         for lang_a, lang_b in itertools.combinations(langs, 2):
             write_per_model_xor(out_dir, task, lang_a, lang_b, task_models, score_wide, records)
-            write_all_models_xor(out_dir, task, lang_a, lang_b, task_models, score_wide, records)
+            for lang, rows in collect_strong_xor_losses(
+                    task, lang_a, lang_b, task_models, score_wide, records).items():
+                losses_by_lang.setdefault(lang, []).extend(rows)
 
-        print(f"[{task}] wrote XOR examples for models {task_models} across {len(langs)} languages")
+        written = write_losses_by_language(out_dir, task, losses_by_lang)
+        print(f"[{task}] models {task_models} across {len(langs)} languages")
+        print(f"[{task}] strong-XOR losses by language: {' '.join(written) or 'none'}")
 
 
 def main():

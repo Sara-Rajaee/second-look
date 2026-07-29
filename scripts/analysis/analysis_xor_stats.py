@@ -5,8 +5,11 @@ model tested for that task (same "strong XOR" definition as
 analysis_xor_examples.py's all_models output).
 
 Usage:
-    python scripts/analysis/analysis_xor_stats.py [--results-dir DIR] [--out-csv PATH]
+    python scripts/analysis/analysis_xor_stats.py [--results-dir DIR] [--out-dir DIR]
                                                     [--tasks TASK ...] [--models MODEL ...]
+
+Outputs:
+    {out_dir}/xor_loser_stats.csv
 """
 
 import argparse
@@ -19,7 +22,8 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from load_results import DEFAULT_RESULTS_DIR, load_examples, local_id
 
-DEFAULT_OUT_CSV = Path("/fnwi_fs/ivi/irlab/personal/stroshi/second_look/outputs/xor_loser_stats.csv")
+DEFAULT_OUT_DIR = Path("/fnwi_fs/ivi/irlab/personal/stroshi/second_look/outputs/xor/stats")
+OUT_CSV_NAME = "xor_loser_stats.csv"
 
 
 def compute_loser_stats(examples: pd.DataFrame,
@@ -103,7 +107,7 @@ def compute_loser_stats(examples: pd.DataFrame,
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--results-dir", default=DEFAULT_RESULTS_DIR)
-    parser.add_argument("--out-csv", default=str(DEFAULT_OUT_CSV))
+    parser.add_argument("--out-dir", default=str(DEFAULT_OUT_DIR))
     parser.add_argument("--tasks", nargs="*", default=None,
                          help="Tasks to process (default: all found in results-dir)")
     parser.add_argument("--models", nargs="*", default=None,
@@ -113,7 +117,7 @@ def main():
     examples = load_examples(args.results_dir)
     stats = compute_loser_stats(examples, tasks=args.tasks, models=args.models)
 
-    out_csv = Path(args.out_csv)
+    out_csv = Path(args.out_dir) / OUT_CSV_NAME
     out_csv.parent.mkdir(parents=True, exist_ok=True)
     stats.to_csv(out_csv, index=False)
     print(stats.to_string(index=False))
