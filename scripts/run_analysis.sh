@@ -29,6 +29,7 @@ XOR_OUT_ROOT="${XOR_OUT_ROOT:-/fnwi_fs/ivi/irlab/personal/stroshi/second_look/ou
 ANALYSES=(
     "analysis_quality_bars:$OUT_ROOT/quality_bars"
     "analysis_heat_map:$OUT_ROOT/heatmaps"
+    "analysis_difficulty_heatmap:$OUT_ROOT/difficulty"
     "analysis_xor_stats:$XOR_OUT_ROOT/stats"
     "analysis_xor_examples:$XOR_OUT_ROOT/examples"
     "check_consistency:$OUT_ROOT/consistency"
