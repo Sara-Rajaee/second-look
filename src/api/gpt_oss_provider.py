@@ -1,4 +1,5 @@
 import re
+from pathlib import Path
 from litellm import acompletion
 from .base_provider import BaseProvider
 
@@ -89,12 +90,32 @@ class GptOssProvider(BaseProvider):
             "raw_generation": raw_content,
         }
 
+    @staticmethod
+    def _model_system_content(path):
+        # System prompt a model card requires (config/models.yaml: system_prompt_file).
+        # Ministral reasoning only reasons with its card's prompt, whose
+        # [THINK]...[/THINK] part has to be sent as a thinking chunk.
+        text = Path(path).read_text(encoding="utf-8")
+        start, end = text.find("[THINK]"), text.find("[/THINK]")
+        if start < 0 or end < 0:
+            return [{"type": "text", "text": text}]
+        return [
+            {"type": "text", "text": text[:start]},
+            {"type": "thinking", "thinking": text[start + len("[THINK]"):end], "closed": True},
+            {"type": "text", "text": text[end + len("[/THINK]"):]},
+        ]
+
     async def generate(self, model_id, prompt, params, system_prompt=None, reasoning_effort=None, thinking_budget=None):
         """Generate completion via liteLLM proxy (async)."""
 
         async def _generate():
             messages = []
-            if system_prompt:
+            if params.get("system_prompt_file"):
+                content = self._model_system_content(params["system_prompt_file"])
+                if system_prompt:
+                    content.append({"type": "text", "text": "\n\n" + system_prompt})
+                messages.append({"role": "system", "content": content})
+            elif system_prompt:
                 messages.append({"role": "system", "content": system_prompt})
             messages.append({"role": "user", "content": prompt})
             kwargs = dict(
@@ -107,11 +128,20 @@ class GptOssProvider(BaseProvider):
                 top_p=params.get("top_p", 1),
                 num_retries=self.max_retries,
                 timeout=self.timeout,
-                extra_body={"chat_template_kwargs": {"enable_thinking": bool(params.get("reasoning", False))}},
             )
+            # enable_thinking is sent only to models whose chat template has that switch
+            # (thinking_switch in config/models.yaml): Mistral tokenizers answer any
+            # chat_template_kwargs with HTTP 400.
+            if params.get("thinking_switch"):
+                kwargs["extra_body"] = {"chat_template_kwargs": {"enable_thinking": bool(params.get("reasoning", False))}}
 
             response = await acompletion(**kwargs)
-            message = response.choices[0].message
-            return self._extract_reasoning(message)
+            output = self._extract_reasoning(response.choices[0].message)
+            # finish_reason "length" marks an output cut off at max_tokens, which was
+            # invisible in the saved results; usage gives the prompt and output lengths.
+            output["finish_reason"] = response.choices[0].finish_reason
+            output["usage"] = {"prompt_tokens": response.usage.prompt_tokens,
+                               "completion_tokens": response.usage.completion_tokens}
+            return output
 
         return await self._retry_with_backoff(_generate)

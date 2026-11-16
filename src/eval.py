@@ -41,15 +41,22 @@ class Evaluator:
             # Prepare prompt
             prompt = self.benchmark.prepare_prompt(example)
             system_prompt = self.benchmark.prepare_system_prompt()
-            # Generate prediction with reasoning configuration
-            output = await self.provider.generate(
-                model_id=self.model_config['model_id'],
-                prompt=prompt,
-                params=generation_params,
-                system_prompt=system_prompt,
-                reasoning_effort=self.reasoning_effort,
-                thinking_budget=self.model_config['default_params'].get('thinking_budget', 0) # setting to 0 for disabling reasoning 
-            )
+            # Generate prediction with reasoning configuration. A request that still fails
+            # after the provider's retries (HTTP 400, timeout) is kept as an empty answer
+            # with its error; it used to abort the whole subset before anything was saved.
+            try:
+                output = await self.provider.generate(
+                    model_id=self.model_config['model_id'],
+                    prompt=prompt,
+                    params=generation_params,
+                    system_prompt=system_prompt,
+                    reasoning_effort=self.reasoning_effort,
+                    thinking_budget=self.model_config['default_params'].get('thinking_budget', 0) # setting to 0 for disabling reasoning
+                )
+            except Exception as exc:
+                print(f"Request failed for {example.id}: {exc}")
+                output = {'reasoning': None, 'generation': '', 'raw_generation': '',
+                          'finish_reason': 'error', 'error': str(exc)}
             
             # Get reference based on benchmark type
             if hasattr(example, 'reference'):
@@ -98,6 +105,8 @@ class Evaluator:
                 'generation': output['generation'],
                 'raw_generation': output['raw_generation'],
                 'finish_reason': output.get('finish_reason'),
+                'usage': output.get('usage'),
+                'error': output.get('error'),
                 'target_text': target_text,
                 'eval_type': eval_type,
                 'points': points
@@ -219,6 +228,12 @@ class Evaluator:
         
         # Evaluate
         metrics = self.benchmark.evaluate(predictions, references, eval_types, points)
+
+        # Failed requests count as wrong answers above, so make them impossible to miss.
+        failed = sum(output['error'] is not None for output in raw_outputs)
+        if failed:
+            metrics['failed_requests'] = failed
+            print(f"WARNING: {failed} of {len(raw_outputs)} requests failed and were scored as empty answers")
 
         # Add per-example scores to raw outputs if available
         if 'per_example_scores' in metrics.keys():

@@ -161,6 +161,19 @@ Examples:
         help='Override concurrency/batch_size (default: use task config)'
     )
     parser.add_argument(
+        '--models-config',
+        type=str,
+        default='config/models.yaml',
+        help='Model registry to load (default: config/models.yaml, the local 3B-12B models; '
+             'API and other models are in config/models_other.yaml)'
+    )
+    parser.add_argument(
+        '--no-reasoning',
+        action='store_true',
+        help='Run with thinking switched off (models with thinking_switch); '
+             'results are saved under <model>_no_reasoning'
+    )
+    parser.add_argument(
         '--distillation',
         action='store_true',
         help='Sample multiple high-temperature outputs and save distillation artifacts'
@@ -199,7 +212,7 @@ async def main():
     
     # Load configurations
     providers_config = load_config('config/providers.yaml')
-    models_config = load_config('config/models.yaml')
+    models_config = load_config(args.models_config)
     tasks_config = load_config('config/tasks.yaml')
     
     # List mode
@@ -212,7 +225,7 @@ async def main():
         # Find specific model
         models_to_eval = [m for m in models_config['models'] if m['name'] == args.model]
         if not models_to_eval:
-            print(f"Error: Model '{args.model}' not found in config/models.yaml")
+            print(f"Error: Model '{args.model}' not found in {args.models_config}")
             print("\nAvailable models:")
             for model in models_config['models']:
                 print(f"  - {model['name']}")
@@ -238,6 +251,10 @@ async def main():
     # Run evaluations
     for model in models_to_eval:
         provider_config = providers_config[model['provider']]
+        if args.no_reasoning:
+            # Same registry entry with thinking off; save_results() already keeps
+            # the two modes in separate folders.
+            model = {**model, 'default_params': {**model['default_params'], 'reasoning': False}}
         
         for task_name, task_config in tasks_to_eval.items():
             # Determine concurrency

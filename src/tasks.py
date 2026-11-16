@@ -145,10 +145,15 @@ class MMMLUExample:
 
 def extract_choice(text):
     """Extract A/B/C/D choice from model output"""
-    for c in text.strip():
-        if c in "ABCDabcd":
-            return c
-    return ""
+    # An answer that opens with the letter ("B", "(b)", "B) Paris") is taken as is.
+    # Otherwise the last standalone capital A-D counts: the first A-D character
+    # anywhere used to win, so "To find ..." was read as "d".
+    text = (text or "").strip()
+    leading = re.match(r'[(*\s]*([A-Da-d])\s*(?:[).:*,]|$)', text)
+    if leading:
+        return leading.group(1).upper()
+    standalone = re.findall(r'(?<![A-Za-z])[A-D](?![A-Za-z])', text)
+    return standalone[-1] if standalone else ""
 
 
 class MMMLUBenchmark(BaseBenchmark):
