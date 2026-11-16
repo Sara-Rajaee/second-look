@@ -4,6 +4,7 @@
 #   SERVE_ARGS     model-specific `vllm serve` flags
 #   MAX_MODEL_LEN  context length to serve
 #   CONCURRENCY    requests in flight (sized to the model's KV cache on a 48 GB GPU)
+#   GPU_MEMORY_UTILIZATION  optional, fraction of GPU memory vLLM may use (default 0.9)
 # and are submitted from the repo root:
 #   sbatch scripts/run_model/<model>.sh TASK[,TASK...] [run.py args, e.g. --no-reasoning]
 set -eo pipefail
@@ -61,7 +62,7 @@ mkdir -p "$APPTAINER_CACHEDIR" "$APPTAINER_TMPDIR"
 # run.py asks for the model by its Hugging Face id, so the server answers to that name.
 HF_HUB_OFFLINE=1 apptainer exec --nv --bind /fnwi_fs --bind "$(dirname "$MODEL_PATH")" "$VLLM_SIF" \
     vllm serve "$MODEL_PATH" --served-model-name "$MODEL_ID" --host 127.0.0.1 --port "$PORT" \
-    --max-model-len "$MAX_MODEL_LEN" --gpu-memory-utilization 0.9 --dtype auto \
+    --max-model-len "$MAX_MODEL_LEN" --gpu-memory-utilization "${GPU_MEMORY_UTILIZATION:-0.9}" --dtype auto \
     "${SERVE_ARGS[@]}" > "${LOG_PREFIX}_vllm.log" 2>&1 &
 VLLM_PID=$!
 trap 'kill "$VLLM_PID" ${METRICS_PID:-} 2>/dev/null' EXIT

@@ -9,8 +9,9 @@
 # qwen3-4b-instruct-base on one RTX A6000 (ILPS). Submit from the repo root:
 #   sbatch scripts/run_model/qwen3-4b-instruct-base.sh TASK[,TASK...] [run.py args]
 # No thinking mode. KV cache holds only ~250k tokens on a 48 GB GPU.
+# Concurrency is estimated from the cache size, not measured.
 MODEL=qwen3-4b-instruct-base
 SERVE_ARGS=()
 MAX_MODEL_LEN=40960
-CONCURRENCY=16
+CONCURRENCY=20
 source "${SLURM_SUBMIT_DIR:-.}/scripts/run_model/_serve_and_eval.sh"

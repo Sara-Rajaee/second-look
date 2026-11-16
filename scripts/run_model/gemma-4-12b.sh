@@ -8,9 +8,11 @@
 #SBATCH --output=logs/run_model_%x_%j.out
 # gemma-4-12b on one RTX A6000 (ILPS). Submit from the repo root:
 #   sbatch scripts/run_model/gemma-4-12b.sh TASK[,TASK...] [run.py args]
-# KV cache is 18 GiB; it filled with ~45 long generations, and 40 in flight still evicted.
+# KV cache is 18 GiB at the default memory fraction, 20 GiB at 0.95. Measured on PolyMath high
+# with thinking: 462 tok/s at 0.95 with 38 in flight, 440 at 0.9 with 40 (evicting), 391 with 28.
 MODEL=gemma-4-12b
 SERVE_ARGS=(--reasoning-parser gemma4)
 MAX_MODEL_LEN=40960
-CONCURRENCY=32
+CONCURRENCY=38
+GPU_MEMORY_UTILIZATION=0.95
 source "${SLURM_SUBMIT_DIR:-.}/scripts/run_model/_serve_and_eval.sh"
