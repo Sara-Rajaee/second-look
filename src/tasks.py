@@ -3,6 +3,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "../
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "../third_party/PolyMath"))
 
 from run_eval import extract_boxed_content
+import scripts as _polymath_scripts          # third_party/PolyMath/eval/scripts.py
 from scripts import math_equal
 
 from datasets import load_dataset, load_from_disk, get_dataset_config_names
@@ -16,6 +17,8 @@ try:
     from math_verify import parse, StringExtractionConfig, LatexExtractionConfig, verify
 except ImportError:
     parse = StringExtractionConfig = LatexExtractionConfig = verify = None
+import functools
+import math
 import re
 import subprocess
 import tempfile
@@ -282,6 +285,158 @@ def normalize_latex(text):
 
 
 
+# --- PolyMath answer matching -------------------------------------------------
+# The boxed answer is taken out with its braces matched and only then normalised.
+# normalize_latex() above runs its regexes over the whole response, where
+# `[^}]*` stops at the first closing brace, and its unit rule drops everything
+# after a leading number: \boxed{2\sqrt{2}} became \boxed{2}}, \boxed{13/24}
+# became \boxed{13}. It is kept for the benchmarks that go through
+# extract_boxed_answer().
+
+POLYMATH_SYMBOLIC_TIMEOUT_S = 3
+
+_POLYMATH_BOXED = re.compile(r'\\boxed\s*\{')
+_POLYMATH_TEXT = r'\\(?:text|mathrm|mathbf|mathit|mathsf|mbox|textbf)\s*\{([^{}]*)\}'
+_POLYMATH_SPACE = r'(?:\s|~|(?<!\\)\\[,;: ]|\\q?quad(?![A-Za-z]))'
+_POLYMATH_NUMBER = re.compile(r'-?\d[\d.,]*')
+# A unit is text, not mathematics: \text{cm}, non-ASCII words and signs (美元, €, °),
+# ^\circ, or a bare word of two or more letters, each optionally squared or cubed.
+# A single letter is a variable (2n, -2i), and anything with an operator or
+# another LaTeX command is an expression.
+_POLYMATH_UNIT_PART = re.compile(
+    r'(?:' + _POLYMATH_SPACE + r'|(?:' + _POLYMATH_TEXT.replace('([^{}]*)', '[^{}]*')
+    + r'|[^\x00-\x7F]|\^\{?\\circ\}?|[A-Za-z]{2,})(?:\^\{?\d\}?)?)')
+
+
+def _polymath_strip_delimiters(expr):
+    expr = re.sub(r'\\displaystyle\s*', '', str(expr)).strip()
+    while len(expr) >= 2 and expr[0] == '$' and expr[-1] == '$':     # $...$ and $$...$$
+        expr = expr[1:-1].strip()
+    return expr
+
+
+def polymath_boxed_contents(text):
+    """Contents of every complete \\boxed{...} in text, in order, braces matched."""
+    contents = []
+    for match in _POLYMATH_BOXED.finditer(text):
+        depth, i = 1, match.end()
+        while i < len(text) and depth:
+            depth += (text[i] == '{') - (text[i] == '}')
+            i += 1
+        if depth == 0:
+            contents.append(text[match.end():i - 1])
+    return contents
+
+
+def polymath_clean(expr):
+    """Strip presentation-only LaTeX. Applied to the boxed answer and to the gold
+    answer alike: about a third of the PolyMath golds are wrapped in $...$."""
+    expr = _polymath_strip_delimiters(expr)
+    for _ in range(2):
+        expr = re.sub(_POLYMATH_TEXT, r'\1', expr)
+    expr = re.sub(r'\\[dt]frac', r'\\frac', expr)
+    expr = re.sub(r'\\(?:left|right)(?![A-Za-z])', '', expr)
+    expr = re.sub(_POLYMATH_SPACE, '', expr)
+    expr = expr.replace('{,}', ',')                                   # LaTeX decimal comma 57{,}00
+    expr = re.sub(r'(?<!\\)\\([{}\[\]])', r'\1', expr)                # \{1,2\} -> {1,2}
+    if re.fullmatch(r'\{[^{}]*\}', expr):                             # \boxed{{x}}, a set {1,2}
+        expr = expr[1:-1]
+    return expr
+
+
+def _polymath_strip_unit(boxed):
+    """'25 \\text{ cm}' -> '25'; None unless the box is a number followed by units."""
+    expr = re.sub(r'^\\?\$\s*|\s*\\?\$$', '', _polymath_strip_delimiters(boxed)).replace('{,}', ',')
+    number = _POLYMATH_NUMBER.match(expr)
+    if not number or number.end() == len(expr):
+        return None
+    pos = number.end()
+    while pos < len(expr):
+        part = _POLYMATH_UNIT_PART.match(expr, pos)
+        if not part:
+            return None
+        pos = part.end()
+    return number.group()
+
+
+def _polymath_normalize_number(expr):
+    """Number formatting: currency sign, percent sign, thousands separators
+    (1,250 and 57.500), decimal comma (26,5), trailing zeros (28.00)."""
+    expr = re.sub(r'^\\?\$|\\?\$$', '', expr)
+    expr = re.sub(r'\\?%$', '', expr)
+    for _ in range(3):
+        expr = re.sub(r'(\d),(\d{3})', r'\1\2', expr)
+    expr = re.sub(r'(\d)\.(\d{3})(?!\d)', r'\1\2', expr)
+    expr = re.sub(r'(\d),(\d{1,2})$', r'\1.\2', expr)
+    expr = re.sub(r'^(-?\d+)\.0+$', r'\1', expr)
+    return expr
+
+
+def polymath_answer_readings(boxed):
+    """Ways to read one boxed answer, the literal one first. The number rules are
+    lossy (0.125 could be read as 125, '1,2' as 1.2), so they only add readings
+    and never replace the literal one."""
+    literal = polymath_clean(boxed)
+    readings = [literal]
+    unit_free = _polymath_strip_unit(boxed)
+    for reading in (_polymath_normalize_number(literal),
+                    _polymath_normalize_number(unit_free) if unit_free else None):
+        if reading and reading not in readings:
+            readings.append(reading)
+    return readings
+
+
+def polymath_is_correct(pred_text, ref):
+    """True if the final \\boxed{} answer of a response equals the gold answer."""
+    boxed = polymath_boxed_contents(pred_text or '')
+    if not boxed:
+        return False
+    # The gold is compared cleaned and, if that differs, also as written: inside
+    # $...$ the vendored parser reads m(n-1) as a product, outside as a function call.
+    golds = list(dict.fromkeys([polymath_clean(ref), str(ref).strip()]))
+    return any(_polymath_math_equal(reading, gold)
+               for reading in polymath_answer_readings(boxed[-1]) for gold in golds)
+
+
+@functools.lru_cache(maxsize=None)
+def _polymath_math_equal(answer, gold):
+    """math_equal, remembered: samples of one prompt repeat the same answers, and a
+    comparison that sympy cannot settle costs the full timeout."""
+    return bool(math_equal(answer, gold))
+
+
+# Two patches to the vendored PolyMath comparison (third_party/PolyMath/eval/scripts.py),
+# applied here so that the vendored file stays as upstream ships it:
+#  - its symbolic comparison runs in a subprocess that is killed after 1 s and then
+#    counts as "not equal", so verdicts depended on how busy the machine was;
+#  - its numeric fallback compares floats with a relative tolerance, which cannot
+#    tell large integers apart: 2^{2022} "equalled" 2^{2023} (both inf) and 2^{99}
+#    "equalled" 2^{99}-1. Answers that are exactly equal never get that far; they
+#    are matched as strings or symbolically.
+# sympy is imported here so that the comparison subprocesses fork with it loaded:
+# importing it inside each one took most of the old 1 s budget on a cold disk.
+import sympy  # noqa: E402,F401
+import sympy.parsing.latex  # noqa: E402,F401
+import sympy.parsing.sympy_parser  # noqa: E402,F401
+
+_polymath_call_with_timeout = _polymath_scripts.call_with_timeout
+_polymath_numeric_equal = _polymath_scripts.numeric_equal
+
+
+def _polymath_patient_call_with_timeout(func, *args, timeout=1, **kwargs):
+    return _polymath_call_with_timeout(func, *args, timeout=POLYMATH_SYMBOLIC_TIMEOUT_S, **kwargs)
+
+
+def _polymath_finite_numeric_equal(prediction, reference):
+    if not max(abs(prediction), abs(reference)) < 2 ** 53:     # also catches inf and nan
+        return False
+    return _polymath_numeric_equal(prediction, reference)
+
+
+_polymath_scripts.call_with_timeout = _polymath_patient_call_with_timeout
+_polymath_scripts.numeric_equal = _polymath_finite_numeric_equal
+
+
 def extract_boxed_answer(text):
     """Extract answer within the \\boxed{{}}"""
     normalized = normalize_latex(text)
@@ -332,16 +487,13 @@ class PolyMathBenchmark(BaseBenchmark):
         )
     
     def evaluate(self, predictions, references, eval_types=None, points=None):
-        """Evaluate MMMLU predictions"""
+        """Evaluate PolyMath predictions"""
         correct = 0
         total = len(predictions)
         scores = []
 
         for pred_text, ref in zip(predictions, references):
-            normalized = normalize_latex(pred_text)
-            extracted = extract_boxed_content(normalized)
-            extracted = extracted[0] if extracted else None
-            is_correct = math_equal(extracted, ref)
+            is_correct = polymath_is_correct(pred_text, ref)
             correct += int(is_correct)
             scores.append(1 if is_correct else 0)
 
