@@ -1,6 +1,5 @@
-# Local (vLLM-served) models between 3B and 12B parameters: the smoke-run grid.
-# API models, models outside that size range, and checkpoints that only exist on
-# Snellius live in config/models_other.yaml (use: run.py --models-config config/models_other.yaml).
+# Model registry for run.py. Local (vLLM-served) models come first, then API models,
+# larger local models and checkpoints whose weights only exist on Snellius.
 models:
   - name: "qwen3-4b-thinking-base"
     provider: "gpt_oss"
@@ -124,3 +123,105 @@ models:
       max_tokens: 4096   # 8K context in total
       top_p: 1
       reasoning: False
+
+  # --- API models, larger local models (gpt-oss-20b/120b) and Snellius-only checkpoints ---
+  - name: "deepseek-v3"
+    provider: "together_ai"
+    model_id: "deepseek-ai/DeepSeek-V3.1"
+    default_params:
+      temperature: 0
+      max_tokens: 8192
+      top_p: 1
+      reasoning: True
+
+  - name: "deepseek-r1"
+    provider: "together_ai"
+    model_id: "deepseek-ai/DeepSeek-R1"
+    default_params:
+      temperature: 0
+      max_tokens: 8192
+      top_p: 1
+      reasoning: True
+
+  - name: "gemini-2.5-flash"
+    provider: "gemini"
+    model_id: "gemini-2.5-flash"
+    default_params:
+      temperature: 0
+      max_tokens: 26600 #26600 - 24576 = 2024
+      top_p: 1
+      thinking_budget: 24576
+      reasoning: True
+
+  - name: "gemini-2.5-pro"
+    provider: "gemini"
+    model_id: "gemini-2.5-pro"
+    default_params:
+      temperature: 0
+      max_tokens: 32768
+      top_p: 1
+      thinking_budget: 30744
+      reasoning: True
+
+  - name: "gpt-4o"
+    provider: "openai"
+    model_id: "gpt-4o"
+    default_params:
+      temperature: 0.7
+      max_tokens: 512
+      top_p: 0.9
+
+  - name: "command-a-reasoning"
+    provider: "cohere"
+    model_id: "command-a-reasoning"
+    default_params:
+      temperature: 0
+      max_tokens: 10216
+      thinking_budget: 8192
+      reasoning: True
+
+  - name: "gpt-oss-20b"
+    provider: "gpt_oss"
+    model_id: "openai/gpt-oss-20b"
+    default_params:
+      temperature: 0
+      max_tokens: 32768
+      top_p: 1
+      reasoning: True
+
+  - name: "gpt-oss-120b"
+    provider: "gpt_oss"
+    model_id: "openai/gpt-oss-120b"
+    default_params:
+      temperature: 0
+      max_tokens: 32768
+      top_p: 1
+      reasoning: True
+
+  - name: "qwen3-sft"
+    provider: "gpt_oss"
+    model_id: "/scratch-shared/srajaee/lingo-reason/models/train_runs/sft/qwen_qwen3-4b-thinking-2507_full_2e-4_distilled-100_20260616_093807" #"/scratch-shared/srajaee/lingo-reason/models/train_runs/{sft}/qwen_qwen3-4b-thinking-2507_full_distilled-100_20260615_125809"
+    default_params:
+      temperature: 0
+      max_tokens: 32768
+      top_p: 1
+      reasoning: True
+
+  - name: "qwen3-sft-v2"
+    provider: "gpt_oss"
+    model_id: "/scratch-shared/srajaee/lingo-reason/models/train_runs/sft/qwen_qwen3-4b-thinking-2507_full_2e-4_distilled-100_20260616_093807" #"/scratch-shared/srajaee/lingo-reason/models/train_runs/{sft}/qwen_qwen3-4b-thinking-2507_full_distilled-100_20260615_125809"
+    default_params:
+      temperature: 0
+      max_tokens: 32768
+      top_p: 1
+      reasoning: True
+
+  - name: "gemini-3.5-flash"
+    provider: "gemini"
+    model_id: "gemini-3.5-flash"
+    default_params:
+      temperature: 0
+      max_tokens: 26600 #26600 - 24576 = 2024
+      top_p: 1
+      thinking_budget: 24576
+      reasoning: True
