@@ -161,6 +161,12 @@ Examples:
         help='Override concurrency/batch_size (default: use task config)'
     )
     parser.add_argument(
+        '--no-reasoning',
+        action='store_true',
+        help='Run with thinking switched off (models with thinking_switch); '
+             'results are saved under <model>_no_reasoning'
+    )
+    parser.add_argument(
         '--distillation',
         action='store_true',
         help='Sample multiple high-temperature outputs and save distillation artifacts'
@@ -238,6 +244,10 @@ async def main():
     # Run evaluations
     for model in models_to_eval:
         provider_config = providers_config[model['provider']]
+        if args.no_reasoning:
+            # Same registry entry with thinking off; save_results() already keeps
+            # the two modes in separate folders.
+            model = {**model, 'default_params': {**model['default_params'], 'reasoning': False}}
         
         for task_name, task_config in tasks_to_eval.items():
             # Determine concurrency

@@ -63,11 +63,20 @@ The vLLM server exposes an OpenAI-compatible API on `localhost` (port `19743` by
 Run an evaluation by specifying a model and a task:
 
 ```bash
+# API models
 python run.py --model gemini-2.5-flash --task polymath
 
-# GPT-OSS models (requires a running vLLM proxy)
+# Local models (require a running vLLM server)
+python run.py --model qwen3.5-4b --task polymath
+python run.py --model qwen3.5-4b --task polymath --no-reasoning   # thinking switched off
 python run.py --model gpt-oss-20b --task mmmlu
-python run.py --model gpt-oss-120b --task polymath
+```
+
+On the ILPS cluster each local model has a submission script that serves it with vLLM
+and runs `run.py` against it in one job (see `scripts/run_model/_serve_and_eval.sh`):
+
+```bash
+sbatch scripts/run_model/qwen3.5-4b.sh mmmlu,polymath [--no-reasoning]
 ```
 
 To see all available models and tasks:

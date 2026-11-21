@@ -1,4 +1,130 @@
+# Model registry for run.py. Local (vLLM-served) models come first, then API models,
+# larger local models and checkpoints whose weights only exist on Snellius.
 models:
+  - name: "qwen3-4b-thinking-base"
+    provider: "gpt_oss"
+    model_id: "Qwen/Qwen3-4B-Thinking-2507"
+    default_params:
+      temperature: 0
+      max_tokens: 32768
+      top_p: 1
+      reasoning: True
+
+  - name: "qwen3-4b-instruct-base"
+    provider: "gpt_oss"
+    model_id: "Qwen/Qwen3-4B-Instruct-2507"
+    default_params:
+      temperature: 0
+      max_tokens: 32768
+      top_p: 1
+      reasoning: False
+
+  - name: "qwen3-4b-thinking"
+    provider: "gpt_oss"
+    model_id: "Qwen/Qwen3-4B-Thinking-2507"
+    default_params:
+      temperature: 0
+      max_tokens: 32768
+      top_p: 1
+      reasoning: True
+
+  - name: "qwen3.5-4b"
+    provider: "gpt_oss"
+    model_id: "Qwen/Qwen3.5-4B"
+    default_params:
+      temperature: 0
+      max_tokens: 32768
+      top_p: 1
+      reasoning: True
+      thinking_switch: True  # chat template has enable_thinking; run.py --no-reasoning turns it off
+
+  - name: "gemma-4-12b"
+    provider: "gpt_oss"
+    model_id: "google/gemma-4-12B-it"
+    default_params:
+      temperature: 0
+      max_tokens: 32768
+      top_p: 1
+      reasoning: True # uses <|channel>thought ... <channel|> markers, not <think>; see gpt_oss_provider.py
+      thinking_switch: True  # chat template has enable_thinking; run.py --no-reasoning turns it off
+
+  # --- newer local models (serving flags and concurrency: scripts/run_model/<name>.sh) ---
+  - name: "qwen3.5-9b"
+    provider: "gpt_oss"
+    model_id: "Qwen/Qwen3.5-9B"
+    default_params:
+      temperature: 0
+      max_tokens: 32768
+      top_p: 1
+      reasoning: True
+      thinking_switch: True  # chat template has enable_thinking; run.py --no-reasoning turns it off
+
+  - name: "gemma-4-e4b"
+    provider: "gpt_oss"
+    model_id: "google/gemma-4-E4B-it"
+    default_params:
+      temperature: 0
+      max_tokens: 32768
+      top_p: 1
+      reasoning: True
+      thinking_switch: True  # chat template has enable_thinking; run.py --no-reasoning turns it off
+
+  - name: "ministral-3-8b-reasoning"
+    provider: "gpt_oss"
+    model_id: "mistralai/Ministral-3-8B-Reasoning-2512"
+    default_params:
+      temperature: 0
+      max_tokens: 32768
+      top_p: 1
+      reasoning: True
+      system_prompt_file: config/system_prompts/ministral-3-reasoning.txt  # from the model card; it does not reason without it
+
+  - name: "ministral-3-8b-instruct"
+    provider: "gpt_oss"
+    model_id: "mistralai/Ministral-3-8B-Instruct-2512-BF16"   # the plain repo is FP8-quantised: garbage output on A6000 (no native FP8)
+    default_params:
+      temperature: 0
+      max_tokens: 8192
+      top_p: 1
+      reasoning: False
+
+  - name: "eurollm-9b"
+    provider: "gpt_oss"
+    model_id: "utter-project/EuroLLM-9B-Instruct-2512"
+    default_params:
+      temperature: 0
+      max_tokens: 8192
+      top_p: 1
+      reasoning: False
+
+  - name: "apertus-8b"
+    provider: "gpt_oss"
+    model_id: "swiss-ai/Apertus-8B-Instruct-2509"
+    default_params:
+      temperature: 0
+      max_tokens: 8192
+      top_p: 1
+      reasoning: False
+
+  - name: "tiny-aya-global"
+    provider: "gpt_oss"
+    model_id: "CohereLabs/tiny-aya-global"
+    default_params:
+      temperature: 0
+      max_tokens: 4096   # 8K context in total: the request is refused if prompt + max_tokens exceeds it
+      top_p: 1
+      reasoning: False
+
+  - name: "aya-expanse-8b"
+    provider: "gpt_oss"
+    model_id: "CohereLabs/aya-expanse-8b"
+    default_params:
+      temperature: 0
+      max_tokens: 4096   # 8K context in total
+      top_p: 1
+      reasoning: False
+
+  # --- API models, larger local models (gpt-oss-20b/120b) and Snellius-only checkpoints ---
   - name: "deepseek-v3"
     provider: "together_ai"
     model_id: "deepseek-ai/DeepSeek-V3.1"
@@ -72,36 +198,9 @@ models:
       top_p: 1
       reasoning: True
 
-  - name: "qwen3-4b-thinking-base"
-    provider: "gpt_oss"
-    model_id: "Qwen/Qwen3-4B-Thinking-2507"
-    default_params:
-      temperature: 0
-      max_tokens: 32768
-      top_p: 1
-      reasoning: True
-
-  - name: "qwen3-4b-instruct-base"
-    provider: "gpt_oss"
-    model_id: "Qwen/Qwen3-4B-Instruct-2507"
-    default_params:
-      temperature: 0
-      max_tokens: 32768
-      top_p: 1
-      reasoning: False
-
   - name: "qwen3-sft"
     provider: "gpt_oss"
     model_id: "/scratch-shared/srajaee/lingo-reason/models/train_runs/sft/qwen_qwen3-4b-thinking-2507_full_2e-4_distilled-100_20260616_093807" #"/scratch-shared/srajaee/lingo-reason/models/train_runs/{sft}/qwen_qwen3-4b-thinking-2507_full_distilled-100_20260615_125809"
-    default_params:
-      temperature: 0
-      max_tokens: 32768
-      top_p: 1
-      reasoning: True
-  
-  - name: "qwen3-4b-thinking"
-    provider: "gpt_oss"
-    model_id: "Qwen/Qwen3-4B-Thinking-2507"
     default_params:
       temperature: 0
       max_tokens: 32768
@@ -116,7 +215,7 @@ models:
       max_tokens: 32768
       top_p: 1
       reasoning: True
-  
+
   - name: "gemini-3.5-flash"
     provider: "gemini"
     model_id: "gemini-3.5-flash"
@@ -126,21 +225,3 @@ models:
       top_p: 1
       thinking_budget: 24576
       reasoning: True
-
-  - name: "qwen3.5-4b"
-    provider: "gpt_oss"
-    model_id: "Qwen/Qwen3.5-4B"
-    default_params:
-      temperature: 0
-      max_tokens: 32768
-      top_p: 1
-      reasoning: True
-
-  - name: "gemma-4-12b"
-    provider: "gpt_oss"
-    model_id: "google/gemma-4-12B-it"
-    default_params:
-      temperature: 0
-      max_tokens: 32768
-      top_p: 1
-      reasoning: True # uses <|channel>thought ... <channel|> markers, not <think>; see gpt_oss_provider.py
